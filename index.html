@@ -1,0 +1,1263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Infinity Admin — Screening Control Panel</title>
+<style>
+:root {
+  --bg-color: #050505;
+  --panel: #111;
+  --panel-2: #1a1a1a;
+  --border: #2a2a2a;
+  --text-color: #ffffff;
+  --text-dim: #999;
+  --primary-red: #E50914;
+  --primary-red-hover: #F6121D;
+  --seat-border: #4CAF50;
+  --seat-selected: #4CAF50;
+  --seat-locked: #FFC107;
+  --seat-booked: #444;
+  --seat-reserved: #3B82F6;
+}
+* { margin:0; padding:0; box-sizing:border-box; font-family:'Segoe UI', Tahoma, sans-serif; }
+body { background:var(--bg-color); color:var(--text-color); }
+.hidden { display:none !important; }
+button { cursor:pointer; font-family:inherit; }
+
+/* Layout shell */
+.shell { display:flex; min-height:100vh; }
+.sidebar {
+  width:220px; background:var(--panel); border-right:1px solid var(--border);
+  padding:24px 0; position:sticky; top:0; height:100vh; flex-shrink:0;
+}
+.sidebar .brand { padding:0 24px 24px; font-size:1.3rem; font-weight:900; letter-spacing:1px; }
+.sidebar .brand span { color:var(--primary-red); }
+.nav-item {
+  padding:14px 24px; color:var(--text-dim); cursor:pointer; border-left:3px solid transparent;
+  display:flex; align-items:center; gap:10px; font-size:0.95rem;
+}
+.nav-item:hover { background:var(--panel-2); color:#fff; }
+.nav-item.active { color:#fff; border-left-color:var(--primary-red); background:var(--panel-2); }
+.main { flex:1; padding:32px; overflow-y:auto; max-height:100vh; }
+
+/* Topbar */
+.topbar { display:flex; justify-content:space-between; align-items:center; margin-bottom:28px; }
+.topbar h1 { font-size:1.6rem; }
+
+/* Buttons */
+.btn-primary {
+  background:var(--primary-red); color:#fff; border:none; padding:12px 24px;
+  font-size:1rem; font-weight:bold; border-radius:6px; transition:background .2s;
+}
+.btn-primary:hover:not(:disabled) { background:var(--primary-red-hover); }
+.btn-primary:disabled { background:#555; color:#888; cursor:not-allowed; }
+.btn-ghost {
+  background:transparent; color:#fff; border:1px solid var(--border);
+  padding:11px 22px; border-radius:6px; font-size:0.95rem;
+}
+.btn-ghost:hover { border-color:#666; }
+.btn-danger { background:#2a0d0d; color:#ff6b6b; border:1px solid #5a1a1a; padding:11px 22px; border-radius:6px; }
+.btn-danger:hover { background:#3a1010; }
+.btn-sm { padding:7px 14px; font-size:0.85rem; }
+
+/* Cards / dashboard */
+.section-title { font-size:1.1rem; margin:28px 0 16px; color:var(--text-dim); text-transform:uppercase; letter-spacing:1px; font-size:0.85rem; }
+.card-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:20px; }
+.s-card {
+  background:var(--panel); border:1px solid var(--border); border-radius:10px;
+  overflow:hidden; cursor:pointer; transition:transform .15s, border-color .15s;
+}
+.s-card:hover { transform:translateY(-3px); border-color:#444; }
+.s-card .banner { height:140px; background-size:cover; background-position:center; background-color:#222; }
+.s-card .body { padding:16px; }
+.s-card .body h3 { font-size:1.1rem; margin-bottom:6px; }
+.s-card .body .meta { color:var(--text-dim); font-size:0.85rem; margin-bottom:4px; }
+.s-card .badge {
+  display:inline-block; margin-top:10px; padding:4px 10px; border-radius:20px;
+  font-size:0.75rem; font-weight:bold;
+}
+.badge.live { background:#0d2a12; color:#4CAF50; }
+.badge.closed { background:#2a2a2a; color:#999; }
+.empty-state {
+  text-align:center; padding:60px 20px; border:2px dashed var(--border); border-radius:12px; color:var(--text-dim);
+}
+.empty-state .btn-primary { margin-top:20px; }
+
+/* Forms */
+.form-panel { background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:28px; max-width:620px; }
+label { display:block; margin-top:18px; margin-bottom:6px; font-weight:600; font-size:0.9rem; }
+input, textarea, select {
+  width:100%; background:var(--panel-2); border:1px solid var(--border); color:#fff;
+  padding:12px; border-radius:6px; font-size:0.95rem;
+}
+input:focus, textarea:focus { outline:none; border-color:var(--primary-red); }
+.hint { color:var(--text-dim); font-size:0.8rem; margin-top:4px; }
+
+/* Wizard steps */
+.steps { display:flex; gap:8px; margin-bottom:28px; }
+.step-pill { flex:1; padding:10px; text-align:center; background:var(--panel); border:1px solid var(--border); border-radius:6px; color:var(--text-dim); font-size:0.85rem; }
+.step-pill.active { border-color:var(--primary-red); color:#fff; }
+.step-pill.done { border-color:var(--seat-border); color:var(--seat-border); }
+.wizard-actions { display:flex; justify-content:space-between; margin-top:28px; gap:12px; }
+
+/* Layout builder */
+.builder-canvas {
+  background:var(--panel); border:1px solid var(--border); border-radius:12px;
+  padding:24px; min-height:200px; overflow-x:auto;
+}
+.sections-row { display:flex; gap:0; align-items:flex-start; }
+.venue-section { display:flex; flex-direction:column; gap:8px; }
+.section-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; gap:8px; }
+.section-head .stitle { font-size:0.8rem; color:var(--text-dim); }
+.pathway {
+  width:44px; align-self:stretch; margin:0 4px; border-radius:6px;
+  background:repeating-linear-gradient(45deg,#1a1a1a,#1a1a1a 6px,#222 6px,#222 12px);
+  display:flex; align-items:center; justify-content:center; color:#555; font-size:0.7rem;
+  writing-mode:vertical-rl; letter-spacing:2px; min-height:60px;
+}
+.build-row { display:flex; gap:6px; align-items:center; }
+.build-row .rlabel { width:20px; font-size:0.8rem; color:var(--text-dim); text-align:center; }
+.mini-seat {
+  width:24px; height:24px; border-radius:4px; border:2px solid var(--seat-border);
+  background:transparent; font-size:0.6rem; display:flex; align-items:center; justify-content:center; color:#666;
+}
+.mini-seat.reserved { background:var(--seat-reserved); border-color:var(--seat-reserved); color:#fff; cursor:pointer; }
+.row-tools { display:flex; gap:4px; margin-left:8px; }
+.row-tools button { background:var(--panel-2); border:1px solid var(--border); color:#ccc; border-radius:4px; padding:3px 8px; font-size:0.75rem; }
+.builder-controls { display:flex; flex-wrap:wrap; gap:8px; margin-top:16px; }
+.builder-controls button { background:var(--panel-2); border:1px solid var(--border); color:#fff; padding:9px 16px; border-radius:6px; font-size:0.85rem; }
+.builder-controls button:hover { border-color:#555; }
+
+/* Management page */
+.mgmt-grid { display:grid; grid-template-columns:1fr 340px; gap:24px; align-items:start; }
+@media(max-width:900px){ .mgmt-grid{ grid-template-columns:1fr; } .sidebar{ display:none; } }
+.mgmt-left { background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:24px; overflow-x:auto; -webkit-overflow-scrolling:touch; }
+.mgmt-left .screen-indicator, .mgmt-left .live-sections { min-width:max-content; }
+.mgmt-right > div {
+  background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:20px; margin-bottom:18px;
+}
+.mgmt-right h3 { font-size:0.85rem; text-transform:uppercase; letter-spacing:1px; color:var(--text-dim); margin-bottom:14px; }
+.stat-row { display:flex; justify-content:space-between; padding:7px 0; border-bottom:1px solid #1e1e1e; font-size:0.9rem; }
+.stat-row .val { font-weight:bold; }
+.control-list { display:flex; flex-direction:column; gap:10px; }
+.control-list button { width:100%; text-align:left; }
+
+/* Live seat grid (management + preview) */
+.screen-indicator { text-align:center; padding:8px; background:linear-gradient(to bottom,#333,transparent); margin-bottom:24px; font-size:0.75rem; letter-spacing:5px; border-radius:50% 50% 0 0; color:#888; }
+.live-sections { display:inline-flex; gap:0; justify-content:center; align-items:flex-start; margin:0 auto; padding:0 4px; }
+.live-section { display:flex; flex-direction:column; gap:8px; }
+.live-section.align-right .live-row { justify-content:flex-end; }
+.live-section.align-left .live-row { justify-content:flex-start; }
+.live-section.align-center .live-row { justify-content:center; }
+.live-row { display:flex; gap:8px; align-items:center; }
+.live-row .rlabel { width:18px; font-size:0.75rem; color:var(--text-dim); }
+.live-seat {
+  width:28px; height:28px; border-radius:5px; border:2px solid var(--seat-border);
+  background:transparent; cursor:pointer; transition:transform .1s; font-size:0.55rem;
+  display:flex; align-items:center; justify-content:center; color:#555;
+}
+.live-seat.booked { background:var(--seat-booked); border-color:var(--seat-booked); color:#888; }
+.live-seat.locked { background:var(--seat-locked); border-color:var(--seat-locked); }
+.live-seat.reserved { background:var(--seat-reserved); border-color:var(--seat-reserved); }
+.live-seat.selectable-prebook:hover { transform:scale(1.15); }
+.live-legend { display:flex; gap:18px; justify-content:center; margin-top:20px; font-size:0.75rem; flex-wrap:wrap; }
+.live-legend .li { display:flex; align-items:center; gap:6px; }
+.lg-box { width:14px; height:14px; border-radius:3px; }
+
+/* Modal */
+.modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.75); display:flex; align-items:center; justify-content:center; z-index:1000; padding:20px; }
+.modal { background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:28px; max-width:480px; width:100%; max-height:85vh; overflow-y:auto; }
+.modal h2 { margin-bottom:16px; }
+.modal .close-x { float:right; background:none; border:none; color:#888; font-size:1.4rem; }
+.detail-line { display:flex; justify-content:space-between; padding:9px 0; border-bottom:1px solid #1e1e1e; }
+.detail-line .k { color:var(--text-dim); }
+.reg-table { width:100%; border-collapse:collapse; margin-top:12px; font-size:0.85rem; }
+.reg-table th, .reg-table td { text-align:left; padding:9px 8px; border-bottom:1px solid #1e1e1e; }
+.reg-table th { color:var(--text-dim); font-weight:600; }
+.toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%); background:#1a1a1a; border:1px solid var(--border); padding:14px 24px; border-radius:8px; z-index:2000; }
+
+/* Login gate */
+#login-overlay { position:fixed; inset:0; z-index:5000; display:flex; align-items:center; justify-content:center; padding:24px;
+  background:radial-gradient(ellipse 100% 70% at 50% 0%, rgba(120,10,15,0.3), transparent 60%), #050505; }
+.login-card { background:var(--panel); border:1px solid var(--border); border-radius:16px; padding:36px 32px; width:100%; max-width:380px; }
+.login-brand { font-size:1.8rem; font-weight:900; letter-spacing:1px; text-align:center; }
+.login-brand span { color:var(--primary-red); }
+.login-sub { text-align:center; color:var(--text-dim); margin:6px 0 26px; font-size:0.9rem; }
+.login-card input { width:100%; background:var(--panel-2); border:1px solid var(--border); color:#fff; padding:14px; border-radius:8px; font-size:1rem; margin-bottom:12px; }
+.login-card input:focus { outline:none; border-color:var(--primary-red); }
+.login-err { color:#ff6b6b; font-size:0.85rem; text-align:center; margin-top:12px; min-height:18px; }
+.sidebar-foot { position:absolute; bottom:16px; left:0; right:0; }
+.sidebar-user { padding:0 24px 8px; color:var(--text-dim); font-size:0.75rem; word-break:break-all; }
+#logout-btn { color:#ff6b6b; }
+.sidebar { position:sticky; }
+
+/* Attendance panel */
+#attendance-panel { margin-top:24px; border-top:1px solid var(--border); padding-top:24px; }
+.att-search { display:flex; gap:10px; align-items:center; justify-content:center; flex-wrap:wrap; margin-bottom:20px; }
+.att-code-input { display:flex; align-items:center; background:var(--panel-2); border:1px solid var(--border); border-radius:8px; overflow:hidden; }
+.att-code-input:focus-within { border-color:var(--primary-red); }
+.att-code-input span { padding:12px 4px 12px 14px; color:#888; font-weight:600; white-space:nowrap; }
+.att-code-input input { border:none; background:transparent; color:#fff; padding:12px 14px 12px 4px; font-size:1rem; width:120px; }
+.att-code-input input:focus { outline:none; }
+.att-card { background:var(--panel-2); border:1px solid var(--border); border-radius:12px; padding:20px; }
+.att-card .att-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:10px; }
+.att-card .att-head h3 { font-size:1.1rem; }
+.att-badge { padding:4px 12px; border-radius:20px; font-size:0.78rem; font-weight:bold; }
+.att-badge.done { background:#0d2a12; color:#4CAF50; }
+.att-badge.pending { background:#2a220d; color:#FFC107; }
+.att-entry { border:1px solid var(--border); border-radius:10px; padding:14px; margin-bottom:12px; }
+.att-entry.attended { border-color:#1d5a2a; background:#0a1a0e; }
+.att-entry .ae-row { display:flex; justify-content:space-between; gap:10px; padding:5px 0; font-size:0.9rem; }
+.att-entry .ae-row .k { color:var(--text-dim); }
+.att-entry .ae-seat { font-size:1.2rem; font-weight:bold; color:var(--primary-red); }
+.att-entry-controls { display:flex; gap:8px; margin-top:12px; flex-wrap:wrap; }
+.att-entry-controls button { padding:8px 14px; border-radius:6px; font-size:0.82rem; border:1px solid var(--border); background:var(--panel); color:#fff; }
+.att-entry-controls .mark-btn { background:#0d2a12; border-color:#1d5a2a; color:#4CAF50; }
+.att-entry-controls .mark-btn.undo { background:#2a220d; border-color:#5a4a1a; color:#FFC107; }
+.att-entry-controls .del-btn { background:#2a0d0d; border-color:#5a1a1a; color:#ff6b6b; }
+.att-save-bar { display:flex; justify-content:flex-end; gap:10px; margin-top:16px; }
+.att-edit-field { width:100%; background:var(--panel); border:1px solid var(--border); color:#fff; padding:10px; border-radius:6px; margin:4px 0; font-size:0.9rem; }
+.live-seat.attended { background:#4CAF50 !important; border-color:#4CAF50 !important; }
+</style>
+</head>
+<body>
+<!-- ===== LOGIN GATE ===== -->
+<div id="login-overlay">
+  <div class="login-card">
+    <div class="login-brand">INFI<span>NITY</span></div>
+    <p class="login-sub">Admin Control Panel</p>
+    <input id="login-email" type="email" placeholder="Email" autocomplete="username">
+    <input id="login-pass" type="password" placeholder="Password" autocomplete="current-password">
+    <button class="btn-primary" id="login-btn" style="width:100%; margin-top:8px;">Sign In</button>
+    <p id="login-err" class="login-err"></p>
+  </div>
+</div>
+
+<div class="shell" id="app-shell" style="display:none;">
+  <aside class="sidebar">
+    <div class="brand">INFI<span>NITY</span></div>
+    <div class="nav-item active" data-nav="dashboard"><span>◈</span> Dashboard</div>
+    <div class="nav-item" data-nav="create"><span>+</span> Create Screening</div>
+    <div class="sidebar-foot">
+      <p id="current-user" class="sidebar-user"></p>
+      <div class="nav-item" id="logout-btn"><span>⏻</span> Log Out</div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <!-- ===== DASHBOARD ===== -->
+    <section id="view-dashboard">
+      <div class="topbar"><h1>Dashboard</h1>
+        <button class="btn-primary" id="btn-new-screening">+ Create Screening</button>
+      </div>
+      <div class="section-title">Live Screenings</div>
+      <div id="live-grid" class="card-grid"></div>
+      <div class="section-title">Previous Screenings</div>
+      <div id="prev-grid" class="card-grid"></div>
+    </section>
+
+    <!-- ===== CREATE WIZARD ===== -->
+    <section id="view-create" class="hidden">
+      <div class="topbar"><h1>Create Screening</h1>
+        <button class="btn-ghost" id="btn-cancel-create">Cancel</button>
+      </div>
+      <div class="steps">
+        <div class="step-pill active" data-step="1">1 · Movie Details</div>
+        <div class="step-pill" data-step="2">2 · Venue Layout</div>
+        <div class="step-pill" data-step="3">3 · Review</div>
+      </div>
+
+      <!-- Step 1 -->
+      <div id="wstep-1" class="form-panel">
+        <label>Movie Banner URL</label>
+        <input id="f-banner" placeholder="https://... (paste an image link)">
+        <div class="hint">Paste a link to an image hosted anywhere (Imgur, postimg, etc.)</div>
+        <label>Movie Title</label>
+        <input id="f-title" placeholder="e.g. Interstellar">
+        <label>Screening Code</label>
+        <input id="f-screening-code" placeholder="e.g. DSR" style="text-transform:uppercase;">
+        <div class="hint">Short code for this screening. Booking codes become INFDOT + this code + registration number (e.g. INFDOTDSR01).</div>
+        <div style="display:flex; gap:12px; flex-wrap:wrap;">
+          <div style="flex:1; min-width:140px;">
+            <label>Language</label>
+            <input id="f-language" placeholder="e.g. Telugu">
+          </div>
+          <div style="flex:1; min-width:140px;">
+            <label>IMDb Rating (optional)</label>
+            <input id="f-imdb" type="number" step="0.1" min="0" max="10" placeholder="e.g. 8.6">
+          </div>
+        </div>
+        <label>Description</label>
+        <textarea id="f-desc" rows="4" placeholder="Short description (line breaks are preserved)"></textarea>
+        <label>Venue</label>
+        <input id="f-venue" placeholder="e.g. Main Auditorium">
+        <div style="display:flex; gap:12px; flex-wrap:wrap;">
+          <div style="flex:1; min-width:140px;">
+            <label>Screening Date</label>
+            <input id="f-date" type="date">
+          </div>
+          <div style="flex:1; min-width:140px;">
+            <label>Screening Time</label>
+            <input id="f-time" type="time">
+          </div>
+        </div>
+        <label>Teaser / Trailer Link (optional)</label>
+        <input id="f-teaser-url" placeholder="https://youtube.com/...">
+        <div style="display:flex; gap:12px; align-items:flex-end;">
+          <div style="flex:1;">
+            <label>Video Type</label>
+            <select id="f-teaser-type">
+              <option value="Trailer">Trailer</option>
+              <option value="Teaser">Teaser</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+        </div>
+        <div class="wizard-actions">
+          <span></span>
+          <button class="btn-primary" id="btn-to-step2">Next →</button>
+        </div>
+      </div>
+
+      <!-- Step 2 -->
+      <div id="wstep-2" class="hidden">
+        <div class="builder-canvas">
+          <div class="screen-indicator">SCREEN</div>
+          <div id="builder-sections" class="sections-row"></div>
+        </div>
+        <div class="builder-controls">
+          <button id="bc-add-section">+ Add Section (with path)</button>
+          <button id="bc-undo">↶ Undo last row</button>
+        </div>
+        <div class="wizard-actions">
+          <button class="btn-ghost" id="btn-back-step1">← Back</button>
+          <button class="btn-primary" id="btn-to-step3">Confirm Layout →</button>
+        </div>
+      </div>
+
+      <!-- Step 3 -->
+      <div id="wstep-3" class="hidden">
+        <div class="form-panel" style="max-width:760px">
+          <div style="display:flex; gap:24px; flex-wrap:wrap;">
+            <div id="review-banner" style="width:200px; height:120px; background-size:cover; background-position:center; border-radius:8px; background-color:#222;"></div>
+            <div>
+              <h2 id="review-title"></h2>
+              <p id="review-desc" style="color:var(--text-dim); margin:8px 0;"></p>
+              <p style="color:var(--text-dim);">Venue: <span id="review-venue" style="color:#fff;"></span></p>
+              <p style="color:var(--text-dim);">When: <span id="review-when" style="color:#fff;"></span></p>
+            </div>
+          </div>
+          <div style="display:flex; gap:32px; margin-top:24px;">
+            <div><div class="hint">Total Seats</div><h2 id="review-seats">0</h2></div>
+            <div><div class="hint">Sections</div><h2 id="review-sections">0</h2></div>
+            <div><div class="hint">Rows</div><h2 id="review-rows">0</h2></div>
+          </div>
+          <div class="builder-canvas" style="margin-top:20px;">
+            <div class="screen-indicator">SCREEN</div>
+            <div id="review-preview" class="live-sections"></div>
+          </div>
+          <div class="wizard-actions">
+            <button class="btn-ghost" id="btn-back-step2">← Edit Layout</button>
+            <button class="btn-primary" id="btn-go-live">Go Live ✦</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== MANAGEMENT ===== -->
+    <section id="view-manage" class="hidden">
+      <div class="topbar">
+        <div>
+          <h1 id="mgmt-title">Screening</h1>
+          <p id="mgmt-when" style="color:var(--text-dim); font-size:0.85rem; margin-top:4px;"></p>
+        </div>
+        <button class="btn-ghost" id="btn-back-dash">← Dashboard</button>
+      </div>
+      <div class="mgmt-grid">
+        <div class="mgmt-left" id="mgmt-left-panel">
+          <div class="screen-indicator">SCREEN</div>
+          <div id="mgmt-sections" class="live-sections"></div>
+          <div class="live-legend">
+            <div class="li"><span class="lg-box" style="border:2px solid var(--seat-border)"></span>Available</div>
+            <div class="li"><span class="lg-box" style="background:var(--seat-booked)"></span>Booked</div>
+            <div class="li"><span class="lg-box" style="background:var(--seat-locked)"></span>In progress</div>
+            <div class="li"><span class="lg-box" style="background:var(--seat-reserved)"></span>Reserved</div>
+            <div class="li"><span class="lg-box" style="background:#4CAF50"></span>Attended</div>
+          </div>
+          <div style="margin-top:20px; text-align:center;">
+            <button class="btn-primary" id="btn-attendance" style="width:auto; padding:12px 30px;">✓ Start Attendance</button>
+          </div>
+          <!-- Attendance panel -->
+          <div id="attendance-panel" class="hidden">
+            <div class="att-search">
+              <div class="att-code-input">
+                <span id="att-prefix">INFDOT</span>
+                <input id="att-number" inputmode="numeric" placeholder="01" autocomplete="off">
+              </div>
+              <button class="btn-primary" id="att-search-btn" style="width:auto; padding:12px 22px;">Search</button>
+            </div>
+            <div id="att-result"></div>
+          </div>
+        </div>
+        <div class="mgmt-right">
+          <div>
+            <h3>Statistics</h3>
+            <div class="stat-row"><span>Total Seats</span><span class="val" id="st-total">0</span></div>
+            <div class="stat-row"><span>Available</span><span class="val" id="st-avail">0</span></div>
+            <div class="stat-row"><span>Booked</span><span class="val" id="st-booked">0</span></div>
+            <div class="stat-row"><span>Reserved</span><span class="val" id="st-reserved">0</span></div>
+            <div class="stat-row"><span>Booking %</span><span class="val" id="st-pct">0%</span></div>
+          </div>
+          <div id="ctrl-prebook">
+            <h3>Pre-book Mode</h3>
+            <p class="hint" id="prebook-status">Off — click to enable, then tap available seats to reserve them.</p>
+            <div class="control-list" style="margin-top:12px;">
+              <button class="btn-ghost" id="btn-toggle-prebook">Enable Pre-book Mode</button>
+            </div>
+          </div>
+          <div>
+            <h3>Registrations</h3>
+            <div class="control-list">
+              <button class="btn-ghost" id="btn-view-regs">View Registrations</button>
+              <button class="btn-ghost" id="btn-export">⤓ Export CSV</button>
+            </div>
+          </div>
+          <div>
+            <h3>Screening Controls</h3>
+            <div class="control-list">
+              <button class="btn-ghost" id="btn-edit-details">✎ Edit Details</button>
+              <button class="btn-danger" id="btn-end-regs">End Registrations</button>
+              <button class="btn-danger" id="btn-end-screening">End Screening</button>
+              <button class="btn-danger" id="btn-delete-screening">🗑 Delete Screening</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div id="modal-root"></div>
+<div id="toast-root"></div>
+
+<script type="module">
+import { db, LOCK_TIMEOUT_MS } from "./firebase-config.js";
+import {
+  collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc,
+  onSnapshot, query, where, writeBatch, serverTimestamp, Timestamp
+} from "https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js";
+import {
+  getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence
+} from "https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js";
+
+/* ---------- Auth gate ---------- */
+const auth = getAuth();
+setPersistence(auth, browserLocalPersistence).catch(()=>{});
+
+onAuthStateChanged(auth, user => {
+  if(user){
+    document.getElementById('login-overlay').style.display='none';
+    document.getElementById('app-shell').style.display='flex';
+    const cu=document.getElementById('current-user'); if(cu) cu.textContent=user.email;
+  } else {
+    document.getElementById('login-overlay').style.display='flex';
+    document.getElementById('app-shell').style.display='none';
+  }
+});
+
+document.getElementById('login-btn').onclick = async () => {
+  const email=document.getElementById('login-email').value.trim();
+  const pass=document.getElementById('login-pass').value;
+  const errEl=document.getElementById('login-err');
+  errEl.textContent='';
+  if(!email||!pass){ errEl.textContent='Enter email and password.'; return; }
+  document.getElementById('login-btn').disabled=true;
+  try {
+    await signInWithEmailAndPassword(auth, email, pass);
+  } catch(e){
+    errEl.textContent = e.code==='auth/invalid-credential' || e.code==='auth/wrong-password' || e.code==='auth/user-not-found'
+      ? 'Incorrect email or password.' : 'Sign-in failed: '+e.message;
+  } finally { document.getElementById('login-btn').disabled=false; }
+};
+document.getElementById('login-pass').addEventListener('keydown', e=>{ if(e.key==='Enter') document.getElementById('login-btn').click(); });
+document.getElementById('logout-btn').onclick = () => { if(confirm('Log out?')) signOut(auth); };
+
+/* ---------- helpers ---------- */
+const $ = id => document.getElementById(id);
+const rowLabel = i => String.fromCharCode(65 + i); // 0->A, 1->B
+const prettySeat = id => id.replace(/^S\d+-/, ''); // "S0-A3" -> "A3" for display
+// Alignment relative to pathways: first section hugs its right path,
+// last hugs its left path, middle sections center. Single section centers.
+function sectionAlign(sIdx, total){
+  if(total===1) return 'align-center';
+  if(sIdx===0) return 'align-right';
+  if(sIdx===total-1) return 'align-left';
+  return 'align-center';
+}
+// Seat numbering is continuous across the WHOLE row, right-to-left:
+// the rightmost seat in the row is 1, increasing leftward across sections.
+// Given the per-section seat counts for one row, returns for each section an
+// array of global seat numbers in left-to-right visual order.
+// e.g. sectionCounts [3,3] -> [[6,5,4],[3,2,1]]  (path sits between the groups)
+function rowSeatNumbers(sectionCounts){
+  const total = sectionCounts.reduce((a,b)=>a+b,0);
+  let posFromLeft = 0;
+  return sectionCounts.map(count => {
+    const nums = [];
+    for(let k=0;k<count;k++){ nums.push(total - posFromLeft); posFromLeft++; }
+    return nums; // already left-to-right (high -> low)
+  });
+}
+function toast(msg){
+  const t = document.createElement('div'); t.className='toast'; t.textContent=msg;
+  $('toast-root').appendChild(t); setTimeout(()=>t.remove(), 2600);
+}
+function showView(name){
+  ['dashboard','create','manage'].forEach(v => $('view-'+v).classList.add('hidden'));
+  $('view-'+name).classList.remove('hidden');
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active', n.dataset.nav===name));
+}
+
+/* =========================================================
+   DASHBOARD — live listener on screenings collection
+   ========================================================= */
+function bannerStyle(url){ return url ? `background-image:url('${url}')` : ''; }
+
+onSnapshot(collection(db,'screenings'), snap => {
+  const live=[], prev=[];
+  snap.forEach(d => { const s={id:d.id, ...d.data()}; (s.status==='ended'?prev:live).push(s); });
+  renderDashboard(live, prev);
+});
+
+function renderDashboard(live, prev){
+  const lg = $('live-grid'), pg = $('prev-grid');
+  if(!live.length){
+    lg.innerHTML = `<div class="empty-state">No live screening right now.
+      <br><button class="btn-primary" onclick="document.getElementById('btn-new-screening').click()">+ Create Screening</button></div>`;
+  } else {
+    lg.innerHTML = live.map(s => `
+      <div class="s-card" data-open="${s.id}">
+        <div class="banner" style="${bannerStyle(s.bannerUrl)}"></div>
+        <div class="body">
+          <h3>${s.title||'Untitled'}</h3>
+          <div class="meta">${s.venue||''}</div>
+          <div class="meta">${s.bookedCount||0} / ${s.totalSeats||0} booked</div>
+          <span class="badge ${s.status==='closed'?'closed':'live'}">${s.status==='closed'?'Bookings closed':'Live'}</span>
+        </div>
+      </div>`).join('');
+  }
+  pg.innerHTML = prev.length ? prev.map(s => `
+    <div class="s-card" data-open="${s.id}">
+      <div class="banner" style="${bannerStyle(s.bannerUrl)}"></div>
+      <div class="body">
+        <h3>${s.title||'Untitled'}</h3>
+        <div class="meta">${s.venue||''}</div>
+        <div class="meta">${s.bookedCount||0} registrations</div>
+        <span class="badge closed">Ended</span>
+      </div>
+    </div>`).join('') : `<div class="empty-state">No previous screenings yet.</div>`;
+
+  document.querySelectorAll('[data-open]').forEach(c =>
+    c.onclick = () => openManagement(c.dataset.open));
+}
+
+/* =========================================================
+   CREATE WIZARD
+   ========================================================= */
+// builderModel: array of sections; each section = { rows: [ {seats:N, reserved:Set<index>} ] }
+let builderModel = [ { rows: [] } ];
+
+$('btn-new-screening').onclick = () => startCreate();
+$('btn-cancel-create').onclick = () => showView('dashboard');
+document.querySelector('[data-nav="create"]').onclick = () => startCreate();
+document.querySelector('[data-nav="dashboard"]').onclick = () => showView('dashboard');
+
+function startCreate(){
+  builderModel = [ { rows: [] } ];
+  ['f-banner','f-title','f-desc','f-venue','f-date','f-time','f-teaser-url','f-screening-code','f-language','f-imdb'].forEach(id=>$(id).value='');
+  $('f-teaser-type').value='Trailer';
+  gotoStep(1);
+  showView('create');
+}
+function gotoStep(n){
+  [1,2,3].forEach(i=>{
+    $('wstep-'+i).classList.toggle('hidden', i!==n);
+    const pill=document.querySelector(`.step-pill[data-step="${i}"]`);
+    pill.classList.toggle('active', i===n);
+    pill.classList.toggle('done', i<n);
+  });
+  if(n===2) renderBuilder();
+  if(n===3) renderReview();
+}
+
+$('btn-to-step2').onclick = () => {
+  if(!$('f-title').value.trim()){ toast('Enter a movie title'); return; }
+  if(!$('f-screening-code').value.trim()){ toast('Enter a screening code'); return; }
+  gotoStep(2);
+};
+$('btn-back-step1').onclick = () => gotoStep(1);
+$('btn-to-step3').onclick = () => {
+  const total = countSeats();
+  if(total===0){ toast('Add at least one row of seats'); return; }
+  gotoStep(3);
+};
+$('btn-back-step2').onclick = () => gotoStep(2);
+
+/* ----- Layout builder rendering ----- */
+$('bc-add-section').onclick = () => { builderModel.push({ rows: [] }); renderBuilder(); };
+$('bc-undo').onclick = () => {
+  for(let i=builderModel.length-1;i>=0;i--){
+    if(builderModel[i].rows.length){ builderModel[i].rows.pop(); break; }
+  }
+  renderBuilder();
+};
+
+function renderBuilder(){
+  const cont = $('builder-sections');
+  cont.innerHTML='';
+  builderModel.forEach((section, sIdx) => {
+    if(sIdx>0){
+      const path = document.createElement('div');
+      path.className='pathway'; path.textContent='PATH';
+      cont.appendChild(path);
+    }
+    const secEl = document.createElement('div');
+    secEl.className='venue-section';
+    const head = document.createElement('div');
+    head.className='section-head';
+    head.innerHTML = `<span class="stitle">Section ${sIdx+1}</span>`;
+    const addRowBtn = document.createElement('button');
+    addRowBtn.className='row-tools'; addRowBtn.innerHTML='<button>+ Add Row</button>';
+    addRowBtn.onclick = () => {
+      const n = parseInt(prompt('How many seats in this row?','8'),10);
+      if(n>0 && n<=40){ section.rows.push({ seats:n, reserved:new Set() }); renderBuilder(); }
+    };
+    head.appendChild(addRowBtn);
+    secEl.appendChild(head);
+
+    section.rows.forEach((row, rIdx) => {
+      const label = rowLabel(rIdx);
+      const rowEl = document.createElement('div');
+      rowEl.className='build-row';
+      rowEl.innerHTML = `<span class="rlabel">${label}</span>`;
+      // global seat numbers for THIS section within the whole row (left-to-right)
+      const counts = builderModel.map(s => s.rows[rIdx]?.seats || 0);
+      const globalNums = rowSeatNumbers(counts)[sIdx];
+      // seats rendered left-to-right; local index i, its global number:
+      for(let i=0;i<row.seats;i++){
+        const gNum = globalNums[i];
+        const seat=document.createElement('div');
+        seat.className='mini-seat' + (row.reserved.has(i)?' reserved':'');
+        seat.title=`${label}${gNum} — click to toggle pre-reserved`;
+        seat.onclick=()=>{ row.reserved.has(i)?row.reserved.delete(i):row.reserved.add(i); renderBuilder(); };
+        rowEl.appendChild(seat);
+      }
+      const tools=document.createElement('div');
+      tools.className='row-tools';
+      tools.innerHTML=`<button data-act="edit">✎</button><button data-act="del">✕</button>`;
+      tools.querySelector('[data-act="del"]').onclick=()=>{ section.rows.splice(rIdx,1); renderBuilder(); };
+      tools.querySelector('[data-act="edit"]').onclick=()=>{
+        const n=parseInt(prompt('New seat count for row '+label, row.seats),10);
+        if(n>0&&n<=40){ row.seats=n; row.reserved=new Set([...row.reserved].filter(x=>x<n)); renderBuilder(); }
+      };
+      rowEl.appendChild(tools);
+      secEl.appendChild(rowEl);
+    });
+    cont.appendChild(secEl);
+  });
+}
+
+function countSeats(){ return builderModel.reduce((a,s)=>a+s.rows.reduce((b,r)=>b+r.seats,0),0); }
+function countRows(){ return builderModel.reduce((a,s)=>a+s.rows.length,0); }
+function maxRows(){ return builderModel.reduce((m,s)=>Math.max(m,s.rows.length),0); }
+
+/* ----- Review ----- */
+function renderReview(){
+  $('review-banner').style.backgroundImage = $('f-banner').value?`url('${$('f-banner').value}')`:'';
+  $('review-title').textContent=$('f-title').value;
+  $('review-desc').textContent=$('f-desc').value;
+  $('review-venue').textContent=$('f-venue').value;
+  const dt=[$('f-date').value, $('f-time').value].filter(Boolean).join(' ');
+  $('review-when').textContent=dt||'—';
+  $('review-seats').textContent=countSeats();
+  $('review-sections').textContent=builderModel.length;
+  $('review-rows').textContent=countRows();
+  // render static preview from builderModel
+  const cont=$('review-preview'); cont.innerHTML='';
+  builderModel.forEach((section,sIdx)=>{
+    if(sIdx>0){ const p=document.createElement('div'); p.className='pathway'; p.textContent='PATH'; cont.appendChild(p); }
+    const sec=document.createElement('div'); sec.className='live-section '+sectionAlign(sIdx,builderModel.length);
+    section.rows.forEach((row,rIdx)=>{
+      const label=rowLabel(rIdx);
+      const rEl=document.createElement('div'); rEl.className='live-row';
+      rEl.innerHTML=`<span class="rlabel">${label}</span>`;
+      for(let i=0;i<row.seats;i++){
+        const s=document.createElement('div');
+        s.className='live-seat'+(row.reserved.has(i)?' reserved':'');
+        rEl.appendChild(s);
+      }
+      sec.appendChild(rEl);
+    });
+    cont.appendChild(sec);
+  });
+}
+
+/* ----- GO LIVE: write screening + seat docs ----- */
+$('btn-go-live').onclick = async () => {
+  $('btn-go-live').disabled=true;
+  try {
+    // Serialize layout. Firestore forbids arrays-of-arrays, so each section
+    // is an object { rows: [seatCount, ...] }.
+    const layout = builderModel.map(sec => ({ rows: sec.rows.map(r => r.seats) }));
+    const total = countSeats();
+
+    const screeningRef = await addDoc(collection(db,'screenings'), {
+      title:$('f-title').value.trim(),
+      screeningCode:$('f-screening-code').value.trim().toUpperCase(),
+      language:$('f-language').value.trim(),
+      imdbRating:$('f-imdb').value.trim(),
+      description:$('f-desc').value,
+      venue:$('f-venue').value.trim(),
+      screeningDate:$('f-date').value||'',
+      screeningTime:$('f-time').value||'',
+      teaserUrl:$('f-teaser-url').value.trim(),
+      teaserType:$('f-teaser-type').value,
+      bannerUrl:$('f-banner').value.trim(),
+      status:'live',
+      regCounter:0,
+      layout,
+      totalSeats:total,
+      bookedCount:0,
+      createdAt:serverTimestamp()
+    });
+
+    // Create all seat documents in batches (max 500 writes per batch).
+    let batch = writeBatch(db), count=0;
+    for(let rIdx=0; rIdx<maxRows(); rIdx++){
+      const label=rowLabel(rIdx);
+      const counts = builderModel.map(s => s.rows[rIdx]?.seats || 0);
+      const numbering = rowSeatNumbers(counts); // per-section global nums, left-to-right
+      for(let sIdx=0; sIdx<builderModel.length; sIdx++){
+        const row=builderModel[sIdx].rows[rIdx];
+        if(!row) continue;
+        const nums=numbering[sIdx];
+        for(let i=0;i<row.seats;i++){
+          const gNum=nums[i];
+          const seatId=`S${sIdx}-${label}${gNum}`;
+          const reserved=row.reserved.has(i);
+          const seatRef=doc(db,'screenings',screeningRef.id,'seats',seatId);
+          batch.set(seatRef, {
+            seatId, row:label, num:gNum, section:sIdx,
+            status: reserved ? 'reserved' : 'available',
+            bookingId:null, lockedBy:null, lockedAt:null
+          });
+          count++;
+          if(count%450===0){ await batch.commit(); batch=writeBatch(db); }
+        }
+      }
+    }
+    await batch.commit();
+    toast('Screening is live!');
+    showView('dashboard');
+  } catch(e){ console.error(e); toast('Error: '+e.message); }
+  finally { $('btn-go-live').disabled=false; }
+};
+
+/* =========================================================
+   MANAGEMENT PAGE
+   ========================================================= */
+let currentScreeningId=null, currentScreening=null, seatsCache={}, prebookMode=false;
+let attCurrentBooking=null, attPanelOpen=false;
+let unsubSeats=null, unsubScreening=null;
+
+async function openManagement(id){
+  currentScreeningId=id; prebookMode=false;
+  // reset attendance panel
+  attPanelOpen=false; attCurrentBooking=null;
+  const ap=$('attendance-panel'); if(ap) ap.classList.add('hidden');
+  const ab=$('btn-attendance'); if(ab) ab.textContent='✓ Start Attendance';
+  if(unsubSeats) unsubSeats();
+  if(unsubScreening) unsubScreening();
+
+  unsubScreening = onSnapshot(doc(db,'screenings',id), snap=>{
+    if(!snap.exists()) return;
+    currentScreening={id, ...snap.data()};
+    $('mgmt-title').textContent=currentScreening.title||'Screening';
+    const when=[currentScreening.venue, currentScreening.screeningDate, currentScreening.screeningTime].filter(Boolean).join(' · ');
+    $('mgmt-when').textContent=when;
+    applyManagementMode();
+  });
+
+  unsubSeats = onSnapshot(collection(db,'screenings',id,'seats'), snap=>{
+    seatsCache={};
+    snap.forEach(d=>{ seatsCache[d.id]={id:d.id, ...d.data()}; });
+    renderMgmtGrid();
+    renderStats();
+  });
+  showView('manage');
+}
+
+// For ended (past) screenings, only stats / registrations / CSV / edit / delete
+// are shown. The live seat layout, pre-book, verify, and end-controls are hidden.
+function applyManagementMode(){
+  const ended = currentScreening?.status==='ended';
+  $('mgmt-left-panel').classList.toggle('hidden', ended);
+  $('ctrl-prebook').classList.toggle('hidden', ended);
+  $('btn-end-regs').classList.toggle('hidden', ended);
+  $('btn-end-screening').classList.toggle('hidden', ended);
+  $('btn-delete-screening').classList.toggle('hidden', !ended); // delete only for past
+  // Edit details available in both, but on ended screenings only detail fields matter.
+}
+
+function renderMgmtGrid(){
+  const cont=$('mgmt-sections'); cont.innerHTML='';
+  if(!currentScreening?.layout) return;
+  const layout=currentScreening.layout;
+  const totalSec=layout.length;
+  const maxR=layout.reduce((m,s)=>Math.max(m,s.rows.length),0);
+  // Build per-section column wrappers so sections render side by side.
+  const secEls=layout.map((section,sIdx)=>{
+    const sec=document.createElement('div'); sec.className='live-section '+sectionAlign(sIdx,totalSec);
+    return sec;
+  });
+  for(let rIdx=0; rIdx<maxR; rIdx++){
+    const label=rowLabel(rIdx);
+    const counts=layout.map(s=>s.rows[rIdx]||0);
+    const numbering=rowSeatNumbers(counts); // per-section global nums, left-to-right
+    layout.forEach((section,sIdx)=>{
+      const seatCount=section.rows[rIdx]||0;
+      const rEl=document.createElement('div'); rEl.className='live-row';
+      // row label sits on the outer (path-facing) side; put on right for right-most section
+      const labelEl=`<span class="rlabel">${label}</span>`;
+      const labelOnLeft = sIdx===0; // leftmost section shows label on its left
+      if(labelOnLeft && seatCount) rEl.innerHTML=labelEl;
+      const nums=numbering[sIdx];
+      for(let i=0;i<seatCount;i++){
+        const gNum=nums[i];
+        const seatId=`S${sIdx}-${label}${gNum}`;
+        const seat=seatsCache[seatId];
+        const st=effectiveStatus(seat);
+        const el=document.createElement('div');
+        el.className='live-seat '+(st==='available'?'':st);
+        if(seat?.attended && st==='booked') el.classList.add('attended');
+        if(prebookMode && st==='available') el.classList.add('selectable-prebook');
+        el.title=prettySeat(seatId);
+        el.onclick=()=>onMgmtSeatClick(seatId, st);
+        rEl.appendChild(el);
+      }
+      if(!labelOnLeft && seatCount) rEl.insertAdjacentHTML('beforeend', labelEl);
+      secEls[sIdx].appendChild(rEl);
+    });
+  }
+  secEls.forEach((sec,sIdx)=>{
+    if(sIdx>0){ const p=document.createElement('div'); p.className='pathway'; p.textContent='PATH'; cont.appendChild(p); }
+    cont.appendChild(sec);
+  });
+}
+
+// A lock older than the timeout is treated as available.
+function effectiveStatus(seat){
+  if(!seat) return 'available';
+  if(seat.status==='locked' && seat.lockedAt){
+    const age = Date.now() - seat.lockedAt.toMillis();
+    if(age > LOCK_TIMEOUT_MS) return 'available';
+  }
+  return seat.status;
+}
+
+function renderStats(){
+  const all=Object.values(seatsCache);
+  const total=all.length;
+  const booked=all.filter(s=>s.status==='booked').length;
+  const reserved=all.filter(s=>s.status==='reserved').length;
+  const locked=all.filter(s=>effectiveStatus(s)==='locked').length;
+  const avail=total-booked-reserved-locked;
+  $('st-total').textContent=total;
+  $('st-avail').textContent=avail;
+  $('st-booked').textContent=booked;
+  $('st-reserved').textContent=reserved;
+  $('st-pct').textContent=total?Math.round((booked+reserved)/total*100)+'%':'0%';
+}
+
+async function onMgmtSeatClick(seatId, status){
+  if(prebookMode){
+    // toggle reserve on available, or un-reserve a reserved seat
+    const ref=doc(db,'screenings',currentScreeningId,'seats',seatId);
+    if(status==='available'){ await updateDoc(ref,{status:'reserved'}); toast(seatId+' reserved'); }
+    else if(status==='reserved'){ await updateDoc(ref,{status:'available'}); toast(seatId+' un-reserved'); }
+    return;
+  }
+  if(status==='booked') showBookingDetails(seatId);
+}
+
+async function showBookingDetails(seatId){
+  const seat=seatsCache[seatId];
+  if(!seat?.bookingId) return;
+  const bSnap=await getDoc(doc(db,'screenings',currentScreeningId,'bookings',seat.bookingId));
+  if(!bSnap.exists()) return;
+  const b=bSnap.data();
+  const entry=(b.entries||[]).find(e=>e.seatId===seatId)||{};
+  const when = b.createdAt?.toDate ? b.createdAt.toDate().toLocaleString() : '—';
+  openModal(`
+    <button class="close-x" data-close>×</button>
+    <h2>Seat ${prettySeat(seatId)}</h2>
+    <div class="detail-line"><span class="k">Name</span><span>${entry.name||'—'}</span></div>
+    <div class="detail-line"><span class="k">Enrollment</span><span>${entry.enrollment||'—'}</span></div>
+    <div class="detail-line"><span class="k">Email</span><span>${entry.email||'—'}</span></div>
+    <div class="detail-line"><span class="k">Phone</span><span>${entry.phone||'—'}</span></div>
+    <div class="detail-line"><span class="k">Booking Code</span><span>${b.bookingCode||'—'}</span></div>
+    <div class="detail-line"><span class="k">Booked At</span><span>${when}</span></div>
+    <div style="margin-top:18px; display:flex; gap:10px;">
+      <button class="btn-danger" data-del="${seat.bookingId}|${seatId}">Delete this registration</button>
+    </div>
+  `);
+}
+
+/* Pre-book toggle */
+$('btn-toggle-prebook').onclick=()=>{
+  prebookMode=!prebookMode;
+  $('btn-toggle-prebook').textContent = prebookMode?'Disable Pre-book Mode':'Enable Pre-book Mode';
+  $('prebook-status').textContent = prebookMode
+    ? 'ON — tap available seats to reserve, tap reserved seats to release.'
+    : 'Off — click to enable, then tap available seats to reserve them.';
+  renderMgmtGrid();
+};
+
+/* View registrations */
+$('btn-view-regs').onclick = async () => {
+  const snap=await getDocs(collection(db,'screenings',currentScreeningId,'bookings'));
+  const rows=[];
+  snap.forEach(d=>{ const b=d.data(); (b.entries||[]).forEach(e=>rows.push({...e, code:b.bookingCode})); });
+  rows.sort((a,b)=>a.seatId.localeCompare(b.seatId, undefined, {numeric:true}));
+  openModal(`
+    <button class="close-x" data-close>×</button>
+    <h2>Registrations (${rows.length})</h2>
+    ${rows.length? `<table class="reg-table"><tr><th>Seat</th><th>Name</th><th>Enroll</th><th>Phone</th><th>Code</th></tr>
+      ${rows.map(r=>`<tr><td>${prettySeat(r.seatId)}</td><td>${r.name}</td><td>${r.enrollment}</td><td>${r.phone||'—'}</td><td>${r.code}</td></tr>`).join('')}
+    </table>` : '<p style="color:#999">No registrations yet.</p>'}
+  `);
+};
+
+/* CSV export */
+$('btn-export').onclick = async () => {
+  const snap=await getDocs(collection(db,'screenings',currentScreeningId,'bookings'));
+  const rows=[['Seat Number','Student Name','Enrollment Number','Email','Phone','Booking Code','Booking Time']];
+  snap.forEach(d=>{
+    const b=d.data();
+    const when=b.createdAt?.toDate?b.createdAt.toDate().toLocaleString():'';
+    (b.entries||[]).forEach(e=>rows.push([prettySeat(e.seatId),e.name,e.enrollment,e.email,e.phone||"",b.bookingCode,when]));
+  });
+  rows.sort((a,b)=> a[0]==='Seat Number'?-1: a[0].localeCompare(b[0],undefined,{numeric:true}));
+  const csv=rows.map(r=>r.map(c=>`"${String(c||'').replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob=new Blob([csv],{type:'text/csv'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=`${(currentScreening?.title||'screening').replace(/\s+/g,'_')}_registrations.csv`;
+  a.click();
+  toast('CSV downloaded');
+};
+
+/* Edit screening details (works live or ended) */
+$('btn-edit-details').onclick = () => {
+  const s=currentScreening;
+  openModal(`
+    <button class="close-x" data-close>×</button>
+    <h2>Edit Details</h2>
+    <label>Banner URL</label><input id="e-banner" value="${(s.bannerUrl||'').replace(/"/g,'&quot;')}">
+    <label>Title</label><input id="e-title" value="${(s.title||'').replace(/"/g,'&quot;')}">
+    <label>Screening Code</label><input id="e-code" value="${(s.screeningCode||'').replace(/"/g,'&quot;')}" style="text-transform:uppercase;">
+    <div style="display:flex; gap:10px;">
+      <div style="flex:1;"><label>Language</label><input id="e-lang" value="${(s.language||'').replace(/"/g,'&quot;')}"></div>
+      <div style="flex:1;"><label>IMDb</label><input id="e-imdb" type="number" step="0.1" value="${s.imdbRating||''}"></div>
+    </div>
+    <label>Description</label><textarea id="e-desc" rows="4">${(s.description||'').replace(/</g,'&lt;')}</textarea>
+    <label>Venue</label><input id="e-venue" value="${(s.venue||'').replace(/"/g,'&quot;')}">
+    <div style="display:flex; gap:10px;">
+      <div style="flex:1;"><label>Date</label><input id="e-date" type="date" value="${s.screeningDate||''}"></div>
+      <div style="flex:1;"><label>Time</label><input id="e-time" type="time" value="${s.screeningTime||''}"></div>
+    </div>
+    <label>Teaser/Trailer URL</label><input id="e-teaser" value="${(s.teaserUrl||'').replace(/"/g,'&quot;')}">
+    <label>Video Type</label>
+    <select id="e-teaser-type">
+      ${['Trailer','Teaser','Other'].map(t=>`<option ${s.teaserType===t?'selected':''}>${t}</option>`).join('')}
+    </select>
+    <button class="btn-primary" id="e-save" style="margin-top:18px;">Save Changes</button>
+  `);
+  $('e-save').onclick = async () => {
+    await updateDoc(doc(db,'screenings',currentScreeningId),{
+      bannerUrl:$('e-banner').value.trim(),
+      title:$('e-title').value.trim(),
+      screeningCode:$('e-code').value.trim().toUpperCase(),
+      language:$('e-lang').value.trim(),
+      imdbRating:$('e-imdb').value.trim(),
+      description:$('e-desc').value,
+      venue:$('e-venue').value.trim(),
+      screeningDate:$('e-date').value,
+      screeningTime:$('e-time').value,
+      teaserUrl:$('e-teaser').value.trim(),
+      teaserType:$('e-teaser-type').value
+    });
+    $('modal-root').innerHTML='';
+    toast('Details updated');
+  };
+};
+
+/* Delete a past screening + all its subcollection docs */
+$('btn-delete-screening').onclick = async () => {
+  if(!confirm('Permanently delete this screening and ALL its bookings and seat data? This cannot be undone.')) return;
+  const sid=currentScreeningId;
+  try {
+    // delete seats
+    const seats=await getDocs(collection(db,'screenings',sid,'seats'));
+    let batch=writeBatch(db), n=0;
+    for(const d of seats.docs){ batch.delete(d.ref); if(++n%450===0){ await batch.commit(); batch=writeBatch(db); } }
+    // delete bookings
+    const bookings=await getDocs(collection(db,'screenings',sid,'bookings'));
+    for(const d of bookings.docs){ batch.delete(d.ref); if(++n%450===0){ await batch.commit(); batch=writeBatch(db); } }
+    await batch.commit();
+    // delete the screening doc itself
+    await deleteDoc(doc(db,'screenings',sid));
+    toast('Screening deleted');
+    if(unsubSeats)unsubSeats(); if(unsubScreening)unsubScreening();
+    showView('dashboard');
+  } catch(e){ console.error(e); toast('Error: '+e.message); }
+};
+
+/* ===== Attendance (on-field operations) ===== */
+
+$('btn-attendance').onclick = () => {
+  attPanelOpen=!attPanelOpen;
+  $('attendance-panel').classList.toggle('hidden', !attPanelOpen);
+  $('btn-attendance').textContent = attPanelOpen ? '✕ Close Attendance' : '✓ Start Attendance';
+  if(attPanelOpen){
+    $('att-prefix').textContent = `INFDOT${(currentScreening?.screeningCode||'').toUpperCase()}`;
+    $('att-number').value=''; $('att-result').innerHTML=''; $('att-number').focus();
+  }
+};
+
+$('att-search-btn').onclick = attSearch;
+$('att-number').addEventListener('keydown', e=>{ if(e.key==='Enter') attSearch(); });
+
+async function attSearch(){
+  const num=$('att-number').value.trim();
+  const box=$('att-result');
+  if(!num){ box.innerHTML='<p style="color:#999">Enter the registration number.</p>'; return; }
+  const code=`INFDOT${(currentScreening?.screeningCode||'').toUpperCase()}${num}`;
+  box.innerHTML='<p style="color:#999">Searching…</p>';
+  const snap=await getDocs(query(collection(db,'screenings',currentScreeningId,'bookings'), where('bookingCode','==',code)));
+  if(snap.empty){ box.innerHTML=`<p style="color:#ff6b6b">No registration found for <b>${code}</b>.</p>`; return; }
+  const d=snap.docs[0];
+  // deep-clone entries so we can edit locally before saving
+  attCurrentBooking={ docId:d.id, code, data:d.data(), edits:JSON.parse(JSON.stringify(d.data().entries||[])), deleted:false };
+  renderAttendance();
+}
+
+function renderAttendance(){
+  const box=$('att-result');
+  if(!attCurrentBooking){ box.innerHTML=''; return; }
+  const { code, data, edits } = attCurrentBooking;
+  const when=data.createdAt?.toDate?data.createdAt.toDate().toLocaleString():'—';
+  const allAttended = edits.length>0 && edits.every(e=>e.attended);
+  box.innerHTML=`
+    <div class="att-card">
+      <div class="att-head">
+        <h3>${code}</h3>
+        <span class="att-badge ${allAttended?'done':'pending'}">${allAttended?'All attended':edits.filter(e=>e.attended).length+' / '+edits.length+' attended'}</span>
+      </div>
+      <p class="hint" style="margin-bottom:14px;">Booked ${when} · ${edits.length} seat(s)</p>
+      <div id="att-entries"></div>
+      <div class="att-save-bar">
+        <button class="btn-danger" id="att-delete-all">Delete Registration</button>
+        <button class="btn-primary" id="att-save" style="width:auto; padding:11px 26px;">Save Changes</button>
+      </div>
+    </div>`;
+  const cont=$('att-entries');
+  edits.forEach((e,idx)=>{
+    const div=document.createElement('div');
+    div.className='att-entry'+(e.attended?' attended':'');
+    div.innerHTML=`
+      <div class="ae-row"><span class="ae-seat">${prettySeat(e.seatId)}</span>
+        <span class="att-badge ${e.attended?'done':'pending'}">${e.attended?'Attended':'Not yet'}</span></div>
+      <div class="ae-row"><span class="k">Name</span><span>${escapeHtmlA(e.name||'')}</span></div>
+      <div class="ae-row"><span class="k">Enrollment</span><span>${escapeHtmlA(e.enrollment||'')}</span></div>
+      <div class="ae-row"><span class="k">Phone</span><span>${escapeHtmlA(e.phone||'—')}</span></div>
+      <div class="ae-row"><span class="k">Email</span><span>${escapeHtmlA(e.email||'—')}</span></div>
+      <div class="att-entry-controls">
+        <button class="mark-btn ${e.attended?'undo':''}" data-mark="${idx}">${e.attended?'↩ Undo':'✓ Mark Attended'}</button>
+        <button data-edit="${idx}">✎ Edit</button>
+        <button data-seat="${idx}">🎟 Change Seat</button>
+        <button class="del-btn" data-del="${idx}">✕ Remove Seat</button>
+      </div>`;
+    cont.appendChild(div);
+  });
+  // wire controls
+  cont.querySelectorAll('[data-mark]').forEach(b=>b.onclick=()=>{ const i=+b.dataset.mark; edits[i].attended=!edits[i].attended; renderAttendance(); });
+  cont.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{
+    const i=+b.dataset.del;
+    if(!confirm(`Remove seat ${prettySeat(edits[i].seatId)} from this registration? (Frees the seat on save.)`)) return;
+    if(!attCurrentBooking.freedSeats) attCurrentBooking.freedSeats=[];
+    attCurrentBooking.freedSeats.push(edits[i].seatId);
+    edits.splice(i,1); renderAttendance();
+  });
+  cont.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>attEditEntry(+b.dataset.edit));
+  cont.querySelectorAll('[data-seat]').forEach(b=>b.onclick=()=>attChangeSeat(+b.dataset.seat));
+  $('att-save').onclick=attSaveChanges;
+  $('att-delete-all').onclick=attDeleteWhole;
+}
+
+function attEditEntry(i){
+  const e=attCurrentBooking.edits[i];
+  openModal(`
+    <button class="close-x" data-close>×</button>
+    <h2>Edit — Seat ${prettySeat(e.seatId)}</h2>
+    <label>Name</label><input class="att-edit-field" id="ee-name" value="${escapeHtmlA(e.name||'').replace(/"/g,'&quot;')}">
+    <label>Enrollment</label><input class="att-edit-field" id="ee-enroll" value="${escapeHtmlA(e.enrollment||'').replace(/"/g,'&quot;')}">
+    <label>Phone</label><input class="att-edit-field" id="ee-phone" value="${escapeHtmlA(e.phone||'').replace(/"/g,'&quot;')}">
+    <label>Email</label><input class="att-edit-field" id="ee-email" value="${escapeHtmlA(e.email||'').replace(/"/g,'&quot;')}">
+    <button class="btn-primary" id="ee-save" style="margin-top:16px;">Update</button>
+    <p class="hint" style="margin-top:8px;">Applied when you click Save Changes below.</p>
+  `);
+  $('ee-save').onclick=()=>{
+    e.name=$('ee-name').value.trim(); e.enrollment=$('ee-enroll').value.trim();
+    e.phone=$('ee-phone').value.trim(); e.email=$('ee-email').value.trim();
+    $('modal-root').innerHTML=''; renderAttendance();
+  };
+}
+
+function attChangeSeat(i){
+  const e=attCurrentBooking.edits[i];
+  // available seats = those in seatsCache with status available
+  const available=Object.values(seatsCache).filter(s=>effectiveStatus(s)==='available').map(s=>s.id).sort((a,b)=>prettySeat(a).localeCompare(prettySeat(b),undefined,{numeric:true}));
+  if(!available.length){ toast('No available seats to reassign to.'); return; }
+  openModal(`
+    <button class="close-x" data-close>×</button>
+    <h2>Change Seat</h2>
+    <p class="hint">Currently ${prettySeat(e.seatId)}. Pick an available seat:</p>
+    <select id="seat-select" class="att-edit-field" style="margin-top:10px;">
+      ${available.map(id=>`<option value="${id}">${prettySeat(id)}</option>`).join('')}
+    </select>
+    <button class="btn-primary" id="seat-save" style="margin-top:16px;">Reassign</button>
+    <p class="hint" style="margin-top:8px;">Applied when you click Save Changes below.</p>
+  `);
+  $('seat-save').onclick=()=>{
+    const newSeat=$('seat-select').value;
+    if(!attCurrentBooking.seatMoves) attCurrentBooking.seatMoves=[];
+    attCurrentBooking.seatMoves.push({ from:e.seatId, to:newSeat });
+    e.seatId=newSeat;
+    $('modal-root').innerHTML=''; renderAttendance();
+  };
+}
+
+async function attSaveChanges(){
+  const cb=attCurrentBooking; if(!cb) return;
+  const bRef=doc(db,'screenings',currentScreeningId,'bookings',cb.docId);
+  try {
+    // If all seats removed, delete the whole booking
+    if(cb.edits.length===0){ await attDeleteWhole(true); return; }
+
+    // 1. Free removed seats
+    for(const sid of (cb.freedSeats||[])){
+      await updateDoc(doc(db,'screenings',currentScreeningId,'seats',sid),{status:'available', bookingId:null, lockedBy:null, lockedAt:null, attended:false});
+    }
+    // 2. Apply seat moves (free old, book new)
+    for(const mv of (cb.seatMoves||[])){
+      // only free the old if it isn't also a "to" of another move / still used
+      const stillUsed = cb.edits.some(e=>e.seatId===mv.from);
+      if(!stillUsed) await updateDoc(doc(db,'screenings',currentScreeningId,'seats',mv.from),{status:'available', bookingId:null, lockedBy:null, lockedAt:null, attended:false});
+      await updateDoc(doc(db,'screenings',currentScreeningId,'seats',mv.to),{status:'booked', bookingId:cb.docId, lockedBy:null, lockedAt:null});
+    }
+    // 3. Write attended flags onto seat docs
+    for(const e of cb.edits){
+      await updateDoc(doc(db,'screenings',currentScreeningId,'seats',e.seatId),{attended:!!e.attended});
+    }
+    // 4. Update booking entries + seatIds
+    await updateDoc(bRef,{ entries:cb.edits, seatIds:cb.edits.map(e=>e.seatId) });
+    // 5. Adjust bookedCount if seats were removed
+    if((cb.freedSeats||[]).length){
+      const scr=await getDoc(doc(db,'screenings',currentScreeningId));
+      await updateDoc(doc(db,'screenings',currentScreeningId),{ bookedCount:Math.max(0,(scr.data().bookedCount||0)-cb.freedSeats.length) });
+    }
+    toast('Changes saved');
+    // refresh from DB
+    const fresh=await getDoc(bRef);
+    if(fresh.exists()){ attCurrentBooking={ docId:cb.docId, code:cb.code, data:fresh.data(), edits:JSON.parse(JSON.stringify(fresh.data().entries||[])) }; renderAttendance(); }
+    else { attCurrentBooking=null; $('att-result').innerHTML='<p class="hint">Registration removed.</p>'; }
+  } catch(err){ console.error(err); toast('Error saving: '+err.message); }
+}
+
+async function attDeleteWhole(skipConfirm){
+  const cb=attCurrentBooking; if(!cb) return;
+  if(!skipConfirm && !confirm('Delete this entire registration? All its seats become available.')) return;
+  try {
+    // free every seat that currently belongs to this booking
+    const allSeats=[...new Set([...(cb.data.seatIds||[]), ...cb.edits.map(e=>e.seatId)])];
+    for(const sid of allSeats){
+      const sSnap=await getDoc(doc(db,'screenings',currentScreeningId,'seats',sid));
+      if(sSnap.exists() && sSnap.data().bookingId===cb.docId){
+        await updateDoc(doc(db,'screenings',currentScreeningId,'seats',sid),{status:'available', bookingId:null, lockedBy:null, lockedAt:null, attended:false});
+      }
+    }
+    await deleteDoc(doc(db,'screenings',currentScreeningId,'bookings',cb.docId));
+    const scr=await getDoc(doc(db,'screenings',currentScreeningId));
+    await updateDoc(doc(db,'screenings',currentScreeningId),{ bookedCount:Math.max(0,(scr.data().bookedCount||0)-(cb.data.seatIds||[]).length) });
+    toast('Registration deleted');
+    attCurrentBooking=null; $('att-result').innerHTML='<p class="hint">Registration deleted.</p>'; $('att-number').value='';
+  } catch(err){ console.error(err); toast('Error: '+err.message); }
+}
+
+function escapeHtmlA(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+/* End registrations / end screening */
+$('btn-end-regs').onclick = async () => {
+  if(!confirm('Close bookings? Users will no longer be able to book. Data is preserved.')) return;
+  await updateDoc(doc(db,'screenings',currentScreeningId),{status:'closed'});
+  toast('Registrations closed');
+};
+$('btn-end-screening').onclick = async () => {
+  if(!confirm('End screening? It moves to Previous Screenings. All data is preserved.')) return;
+  await updateDoc(doc(db,'screenings',currentScreeningId),{status:'ended', endedAt:serverTimestamp()});
+  toast('Screening ended');
+  showView('dashboard');
+};
+
+$('btn-back-dash').onclick = () => { if(unsubSeats)unsubSeats(); if(unsubScreening)unsubScreening(); showView('dashboard'); };
+
+/* ---------- Modal ---------- */
+function openModal(html){
+  const root=$('modal-root');
+  root.innerHTML=`<div class="modal-overlay"><div class="modal">${html}</div></div>`;
+  root.querySelector('.modal-overlay').onclick=e=>{ if(e.target.classList.contains('modal-overlay')) root.innerHTML=''; };
+  root.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>root.innerHTML='');
+  const del=root.querySelector('[data-del]');
+  if(del) del.onclick=async()=>{
+    const [bookingId,seatId]=del.dataset.del.split('|');
+    if(!confirm('Delete registration for '+seatId+'? The seat becomes available.')) return;
+    await deleteRegistration(bookingId, seatId);
+    root.innerHTML='';
+  };
+}
+
+async function deleteRegistration(bookingId, seatId){
+  const bRef=doc(db,'screenings',currentScreeningId,'bookings',bookingId);
+  const bSnap=await getDoc(bRef);
+  if(!bSnap.exists()) return;
+  const b=bSnap.data();
+  const remaining=(b.entries||[]).filter(e=>e.seatId!==seatId);
+  // free the seat
+  await updateDoc(doc(db,'screenings',currentScreeningId,'seats',seatId),
+    {status:'available', bookingId:null, lockedBy:null, lockedAt:null});
+  if(remaining.length===0){ await deleteDoc(bRef); }
+  else { await updateDoc(bRef,{entries:remaining, seatIds:remaining.map(e=>e.seatId)}); }
+  // decrement booked count
+  const scr=await getDoc(doc(db,'screenings',currentScreeningId));
+  await updateDoc(doc(db,'screenings',currentScreeningId),
+    {bookedCount:Math.max(0,(scr.data().bookedCount||1)-1)});
+  toast('Registration deleted, '+seatId+' freed');
+}
+
+/* start */
+showView('dashboard');
+</script>
+</body>
+</html>
