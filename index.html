@@ -392,7 +392,7 @@ input:focus, textarea:focus { outline:none; border-color:var(--primary-red); }
           <div id="attendance-panel" class="hidden">
             <div class="att-search">
               <div class="att-code-input">
-                <span id="att-prefix">INFDOT</span>
+                <span id="att-prefix">INFDOT </span>
                 <input id="att-number" inputmode="numeric" placeholder="01" autocomplete="off">
               </div>
               <button class="btn-primary" id="att-search-btn" style="width:auto; padding:12px 22px;">Search</button>
@@ -1031,7 +1031,7 @@ $('btn-attendance').onclick = () => {
   $('attendance-panel').classList.toggle('hidden', !attPanelOpen);
   $('btn-attendance').textContent = attPanelOpen ? '✕ Close Attendance' : '✓ Start Attendance';
   if(attPanelOpen){
-    $('att-prefix').textContent = `INFDOT${(currentScreening?.screeningCode||'').toUpperCase()}`;
+    $('att-prefix').textContent = `INFDOT ${(currentScreening?.screeningCode||'').toUpperCase()}`;
     $('att-number').value=''; $('att-result').innerHTML=''; $('att-number').focus();
   }
 };
@@ -1043,7 +1043,7 @@ async function attSearch(){
   const num=$('att-number').value.trim();
   const box=$('att-result');
   if(!num){ box.innerHTML='<p style="color:#999">Enter the registration number.</p>'; return; }
-  const code=`INFDOT${(currentScreening?.screeningCode||'').toUpperCase()}${num}`;
+  const code=`INFDOT ${(currentScreening?.screeningCode||'').toUpperCase()}${num}`;
   box.innerHTML='<p style="color:#999">Searching…</p>';
   const snap=await getDocs(query(collection(db,'screenings',currentScreeningId,'bookings'), where('bookingCode','==',code)));
   if(snap.empty){ box.innerHTML=`<p style="color:#ff6b6b">No registration found for <b>${code}</b>.</p>`; return; }
